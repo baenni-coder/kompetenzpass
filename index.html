@@ -17,6 +17,20 @@
                 <h2>Willkommen!</h2>
                 <input type="text" id="username" placeholder="Dein Name">
                 <button onclick="login()">Einloggen</button>
+                <div class="teacher-login-link">
+                    <a href="#" onclick="showTeacherLogin(); return false;">🔐 Lehrer-Login</a>
+                </div>
+            </div>
+            
+            <!-- Lehrer-Login (zunächst versteckt) -->
+            <div id="teacherLoginBox" class="login-box hidden">
+                <h2>Lehrer-Login</h2>
+                <input type="password" id="teacherPassword" placeholder="Passwort">
+                <button onclick="loginTeacher()">Als Lehrer einloggen</button>
+                <div class="teacher-login-link">
+                    <a href="#" onclick="showStudentLogin(); return false;">← Zurück zum Schüler-Login</a>
+                </div>
+                <p class="hint">Standard-Passwort: admin123</p>
             </div>
         </div>
 
@@ -35,6 +49,97 @@
                 <button onclick="saveProgress()">💾 Fortschritt speichern</button>
                 <button onclick="exportProgress()" class="primary">📄 Als PDF exportieren</button>
                 <button onclick="logout()" class="secondary">Ausloggen</button>
+            </div>
+        </div>
+
+        <!-- Lehrer-Dashboard (zunächst versteckt) -->
+        <div id="teacherArea" class="container hidden">
+            <header>
+                <h1>🎓 Lehrer-Dashboard</h1>
+                <p class="subtitle">Kompetenzen verwalten und Schülerfortschritte einsehen</p>
+            </header>
+
+            <!-- Tab Navigation -->
+            <div class="tab-navigation">
+                <button class="tab-button active" onclick="switchTab('competencies-tab')">
+                    📚 Kompetenzen verwalten
+                </button>
+                <button class="tab-button" onclick="switchTab('students-tab')">
+                    👥 Schülerübersicht
+                </button>
+                <button class="tab-button" onclick="switchTab('settings-tab')">
+                    ⚙️ Einstellungen
+                </button>
+            </div>
+
+            <!-- Tab 1: Kompetenzen verwalten -->
+            <div id="competencies-tab" class="tab-content">
+                <div class="action-bar">
+                    <button onclick="addNewCompetency()" class="btn-add">
+                        ➕ Neue Kompetenz hinzufügen
+                    </button>
+                    <button onclick="resetToDefaults()" class="btn-reset">
+                        🔄 Auf Standard zurücksetzen
+                    </button>
+                </div>
+
+                <div id="competencyList" class="competency-manager">
+                    <!-- Kompetenzen werden hier eingefügt -->
+                </div>
+
+                <div class="info-box">
+                    <p>💡 <strong>Tipp:</strong> Änderungen werden automatisch gespeichert und sind sofort für alle Schüler sichtbar.</p>
+                </div>
+            </div>
+
+            <!-- Tab 2: Schülerübersicht -->
+            <div id="students-tab" class="tab-content hidden">
+                <div class="filter-bar">
+                    <input type="text" id="studentSearch" placeholder="🔍 Schüler suchen..." onkeyup="filterStudents()">
+                    <select id="classFilter" onchange="filterStudents()">
+                        <option value="">Alle Klassen</option>
+                    </select>
+                </div>
+
+                <div id="studentsList" class="students-grid">
+                    <!-- Schülerkarten werden hier eingefügt -->
+                </div>
+
+                <div class="stats-box">
+                    <div class="stat">
+                        <span class="stat-label">Anzahl Schüler:</span>
+                        <span id="totalStudents" class="stat-value">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Durchschnittlicher Fortschritt:</span>
+                        <span id="avgProgress" class="stat-value">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Einstellungen -->
+            <div id="settings-tab" class="tab-content hidden">
+                <div class="settings-section">
+                    <h3>🔐 Passwort ändern</h3>
+                    <input type="password" id="newPassword" placeholder="Neues Passwort">
+                    <input type="password" id="confirmPassword" placeholder="Passwort bestätigen">
+                    <button onclick="changePassword()">Passwort ändern</button>
+                </div>
+
+                <div class="settings-section">
+                    <h3>📊 Daten exportieren</h3>
+                    <button onclick="exportAllData()">📥 Alle Schülerdaten als CSV exportieren</button>
+                    <button onclick="exportClassReport()">📈 Klassenbericht als PDF</button>
+                </div>
+
+                <div class="settings-section">
+                    <h3>🗑️ Daten verwalten</h3>
+                    <button onclick="clearStudentData()" class="btn-danger">Alle Schülerdaten löschen</button>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button onclick="logoutTeacher()" class="secondary">Abmelden</button>
             </div>
         </div>
     </div>

@@ -1,5 +1,5 @@
-// Kompetenzbereiche definieren - angepasst an Schweizer Lehrplan 21
-const competencies = [
+// Standard-Kompetenzen als Backup
+const defaultCompetencies = [
     { 
         id: 1, 
         name: "👨‍💻 Programmieren", 
@@ -38,15 +38,33 @@ const competencies = [
     }
 ];
 
+// Kompetenzen laden (entweder custom oder default)
+let competencies = [];
+function loadCompetencies() {
+    const saved = localStorage.getItem('customCompetencies');
+    if (saved) {
+        competencies = JSON.parse(saved);
+    } else {
+        competencies = [...defaultCompetencies];
+    }
+}
+
 // Globale Variablen
 let currentUser = null;
 let userRatings = {};
 
 // Beim Laden der Seite
 window.onload = function() {
+    // Kompetenzen laden
+    loadCompetencies();
+    
     // Prüfen ob bereits eingeloggt
     const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
+    const isTeacher = localStorage.getItem('isTeacher') === 'true';
+    
+    if (isTeacher) {
+        showTeacherDashboard();
+    } else if (savedUser) {
         currentUser = savedUser;
         loadUserData();
         showMainArea();
@@ -56,6 +74,12 @@ window.onload = function() {
     document.getElementById('username').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             login();
+        }
+    });
+    
+    document.getElementById('teacherPassword').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            loginTeacher();
         }
     });
 };
@@ -455,3 +479,418 @@ function showNotification(message, type = 'info') {
         }, 300);
     }, 3000);
 }
+
+// ============= LEHRER-FUNKTIONEN =============
+
+// Standard-Passwort (kann geändert werden)
+const DEFAULT_TEACHER_PASSWORD = 'admin123';
+
+// Login-Ansichten wechseln
+function showTeacherLogin() {
+    document.querySelector('.login-box').classList.add('hidden');
+    document.getElementById('teacherLoginBox').classList.remove('hidden');
+    document.getElementById('teacherPassword').focus();
+}
+
+function showStudentLogin() {
+    document.getElementById('teacherLoginBox').classList.add('hidden');
+    document.querySelector('.login-box').classList.remove('hidden');
+    document.getElementById('username').focus();
+}
+
+// Lehrer Login
+function loginTeacher() {
+    const password = document.getElementById('teacherPassword').value;
+    const savedPassword = localStorage.getItem('teacherPassword') || DEFAULT_TEACHER_PASSWORD;
+    
+    if (password === savedPassword) {
+        localStorage.setItem('isTeacher', 'true');
+        showTeacherDashboard();
+        showNotification('Willkommen im Lehrer-Dashboard!', 'success');
+    } else {
+        showNotification('Falsches Passwort!', 'error');
+        document.getElementById('teacherPassword').value = '';
+    }
+}
+
+// Lehrer Dashboard anzeigen
+function showTeacherDashboard() {
+    document.getElementById('loginArea').classList.add('hidden');
+    document.getElementById('mainArea').classList.add('hidden');
+    document.getElementById('teacherArea').classList.remove('hidden');
+    
+    loadCompetencyManager();
+    loadStudentsOverview();
+}
+
+// Lehrer abmelden
+function logoutTeacher() {
+    if (confirm('Möchtest du dich wirklich abmelden?')) {
+        localStorage.removeItem('isTeacher');
+        document.getElementById('teacherArea').classList.add('hidden');
+        document.getElementById('loginArea').classList.remove('hidden');
+        document.getElementById('teacherPassword').value = '';
+        showStudentLogin();
+    }
+}
+
+// Tab-Wechsel
+function switchTab(tabId) {
+    // Alle Tabs verstecken
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.add('hidden');
+    });
+    
+    // Alle Tab-Buttons deaktivieren
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Gewählten Tab anzeigen
+    document.getElementById(tabId).classList.remove('hidden');
+    
+    // Aktiven Button markieren
+    event.target.classList.add('active');
+    
+    // Inhalt laden je nach Tab
+    if (tabId === 'students-tab') {
+        loadStudentsOverview();
+    }
+}
+
+// ============= KOMPETENZEN VERWALTEN =============
+
+// Kompetenzen-Manager laden
+function loadCompetencyManager() {
+    const container = document.getElementById('competencyList');
+    container.innerHTML = '';
+    
+    competencies.forEach((comp, index) => {
+        const item = document.createElement('div');
+        item.className = 'competency-item';
+        item.id = `comp-item-${comp.id}`;
+        
+        item.innerHTML = `
+            <div class="competency-content">
+                <div class="competency-name">${comp.name}</div>
+                <div class="competency-desc">${comp.description}</div>
+            </div>
+            <div class="competency-actions">
+                <button class="btn-icon" onclick="editCompetency(${comp.id})" title="Bearbeiten">
+                    ✏️
+                </button>
+                <button class="btn-icon delete" onclick="deleteCompetency(${comp.id})" title="Löschen">
+                    🗑️
+                </button>
+            </div>
+        `;
+        
+        container.appendChild(item);
+    });
+}
+
+// Neue Kompetenz hinzufügen
+function addNewCompetency() {
+    const newId = Math.max(...competencies.map(c => c.id), 0) + 1;
+    const newCompetency = {
+        id: newId,
+        name: "📚 Neue Kompetenz",
+        description: "Beschreibung hier eingeben",
+        subskills: []
+    };
+    
+    competencies.push(newCompetency);
+    saveCompetencies();
+    loadCompetencyManager();
+    
+    // Direkt in Bearbeitungsmodus
+    setTimeout(() => editCompetency(newId), 100);
+    
+    showNotification('Neue Kompetenz hinzugefügt!', 'success');
+}
+
+// Kompetenz bearbeiten
+function editCompetency(id) {
+    const comp = competencies.find(c => c.id === id);
+    const item = document.getElementById(`comp-item-${id}`);
+    
+    item.classList.add('editing');
+    item.innerHTML = `
+        <div class="edit-form">
+            <input type="text" id="edit-name-${id}" value="${comp.name}" placeholder="Name (mit Emoji)">
+            <input type="text" id="edit-desc-${id}" value="${comp.description}" placeholder="Beschreibung">
+            <div class="edit-form-buttons">
+                <button onclick="saveCompetencyEdit(${id})" class="btn-add">💾 Speichern</button>
+                <button onclick="cancelEdit(${id})" class="secondary">❌ Abbrechen</button>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById(`edit-name-${id}`).focus();
+}
+
+// Bearbeitung speichern
+function saveCompetencyEdit(id) {
+    const comp = competencies.find(c => c.id === id);
+    const newName = document.getElementById(`edit-name-${id}`).value.trim();
+    const newDesc = document.getElementById(`edit-desc-${id}`).value.trim();
+    
+    if (newName === '' || newDesc === '') {
+        showNotification('Bitte alle Felder ausfüllen!', 'error');
+        return;
+    }
+    
+    comp.name = newName;
+    comp.description = newDesc;
+    
+    saveCompetencies();
+    loadCompetencyManager();
+    showNotification('Kompetenz aktualisiert!', 'success');
+}
+
+// Bearbeitung abbrechen
+function cancelEdit(id) {
+    loadCompetencyManager();
+}
+
+// Kompetenz löschen
+function deleteCompetency(id) {
+    if (competencies.length <= 1) {
+        showNotification('Mindestens eine Kompetenz muss vorhanden sein!', 'error');
+        return;
+    }
+    
+    if (confirm('Diese Kompetenz wirklich löschen? Alle Schülerbewertungen für diese Kompetenz gehen verloren!')) {
+        competencies = competencies.filter(c => c.id !== id);
+        saveCompetencies();
+        loadCompetencyManager();
+        
+        // Lösche auch alle Bewertungen für diese Kompetenz
+        cleanupRatings(id);
+        
+        showNotification('Kompetenz gelöscht!', 'success');
+    }
+}
+
+// Auf Standard zurücksetzen
+function resetToDefaults() {
+    if (confirm('Alle Kompetenzen auf Standard zurücksetzen? Deine Anpassungen gehen verloren!')) {
+        competencies = [...defaultCompetencies];
+        saveCompetencies();
+        loadCompetencyManager();
+        showNotification('Kompetenzen zurückgesetzt!', 'success');
+    }
+}
+
+// Kompetenzen speichern
+function saveCompetencies() {
+    localStorage.setItem('customCompetencies', JSON.stringify(competencies));
+}
+
+// Bewertungen aufräumen nach Löschen
+function cleanupRatings(competencyId) {
+    // Hole alle Schüler
+    const allStudents = getAllStudents();
+    
+    allStudents.forEach(student => {
+        const ratingsKey = `ratings_${student}`;
+        const ratings = JSON.parse(localStorage.getItem(ratingsKey) || '{}');
+        delete ratings[competencyId];
+        localStorage.setItem(ratingsKey, JSON.stringify(ratings));
+    });
+}
+
+// ============= SCHÜLERÜBERSICHT =============
+
+// Alle Schüler abrufen
+function getAllStudents() {
+    const students = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith('ratings_')) {
+            students.push(key.replace('ratings_', ''));
+        }
+    }
+    return students;
+}
+
+// Schülerübersicht laden
+function loadStudentsOverview() {
+    const students = getAllStudents();
+    const container = document.getElementById('studentsList');
+    container.innerHTML = '';
+    
+    if (students.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #666;">Noch keine Schüler haben sich angemeldet.</p>';
+        document.getElementById('totalStudents').textContent = '0';
+        document.getElementById('avgProgress').textContent = '0%';
+        return;
+    }
+    
+    let totalProgress = 0;
+    
+    students.forEach(studentName => {
+        const ratings = JSON.parse(localStorage.getItem(`ratings_${studentName}`) || '{}');
+        const progress = calculateStudentProgress(ratings);
+        totalProgress += progress;
+        
+        const card = document.createElement('div');
+        card.className = 'student-card';
+        card.onclick = () => viewStudentDetails(studentName);
+        
+        card.innerHTML = `
+            <div class="student-name">${studentName}</div>
+            <div class="student-info">Bewertete Kompetenzen: ${Object.keys(ratings).length}/${competencies.length}</div>
+            <div class="student-info">Letzter Zugriff: ${getLastAccess(studentName)}</div>
+            <div class="student-progress">
+                <div class="mini-progress-bar">
+                    <div class="mini-progress-fill" style="width: ${progress}%"></div>
+                </div>
+                <div style="text-align: center; margin-top: 5px; font-size: 12px; color: #666;">${progress}%</div>
+            </div>
+        `;
+        
+        container.appendChild(card);
+    });
+    
+    // Statistiken aktualisieren
+    document.getElementById('totalStudents').textContent = students.length;
+    document.getElementById('avgProgress').textContent = Math.round(totalProgress / students.length) + '%';
+}
+
+// Schülerfortschritt berechnen
+function calculateStudentProgress(ratings) {
+    const totalPossible = competencies.length * 5;
+    const currentTotal = Object.values(ratings).reduce((sum, rating) => sum + rating, 0);
+    return Math.round((currentTotal / totalPossible) * 100);
+}
+
+// Letzter Zugriff (simuliert)
+function getLastAccess(studentName) {
+    const lastAccess = localStorage.getItem(`lastAccess_${studentName}`);
+    if (lastAccess) {
+        return new Date(lastAccess).toLocaleDateString('de-CH');
+    }
+    return 'Unbekannt';
+}
+
+// Schülerdetails anzeigen
+function viewStudentDetails(studentName) {
+    alert(`Detailansicht für ${studentName} wird in der nächsten Version verfügbar sein!`);
+    // Hier könnte man später eine detaillierte Ansicht implementieren
+}
+
+// Schüler filtern
+function filterStudents() {
+    const searchTerm = document.getElementById('studentSearch').value.toLowerCase();
+    const cards = document.querySelectorAll('.student-card');
+    
+    cards.forEach(card => {
+        const name = card.querySelector('.student-name').textContent.toLowerCase();
+        if (name.includes(searchTerm)) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+// ============= EINSTELLUNGEN =============
+
+// Passwort ändern
+function changePassword() {
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    
+    if (newPassword === '' || confirmPassword === '') {
+        showNotification('Bitte beide Passwortfelder ausfüllen!', 'error');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showNotification('Passwörter stimmen nicht überein!', 'error');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        showNotification('Passwort muss mindestens 6 Zeichen lang sein!', 'error');
+        return;
+    }
+    
+    localStorage.setItem('teacherPassword', newPassword);
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    showNotification('Passwort erfolgreich geändert!', 'success');
+}
+
+// Alle Daten exportieren (CSV)
+function exportAllData() {
+    const students = getAllStudents();
+    
+    if (students.length === 0) {
+        showNotification('Keine Schülerdaten vorhanden!', 'error');
+        return;
+    }
+    
+    let csv = 'Schülername';
+    competencies.forEach(comp => {
+        csv += `,${comp.name.replace(/[^\w\s]/gi, '')}`;
+    });
+    csv += ',Gesamtfortschritt\n';
+    
+    students.forEach(studentName => {
+        const ratings = JSON.parse(localStorage.getItem(`ratings_${studentName}`) || '{}');
+        csv += studentName;
+        
+        competencies.forEach(comp => {
+            const rating = ratings[comp.id] || 0;
+            csv += `,${rating}`;
+        });
+        
+        const progress = calculateStudentProgress(ratings);
+        csv += `,${progress}%\n`;
+    });
+    
+    // CSV herunterladen
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Kompetenzpass_Klasse_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    showNotification('Daten exportiert!', 'success');
+}
+
+// Klassenbericht als PDF
+function exportClassReport() {
+    showNotification('PDF-Klassenbericht wird in der nächsten Version verfügbar sein!', 'info');
+    // Hier könnte man später einen detaillierten PDF-Bericht implementieren
+}
+
+// Schülerdaten löschen
+function clearStudentData() {
+    if (confirm('ACHTUNG: Alle Schülerdaten werden unwiderruflich gelöscht! Wirklich fortfahren?')) {
+        if (confirm('Bist du dir wirklich sicher? Diese Aktion kann nicht rückgängig gemacht werden!')) {
+            const students = getAllStudents();
+            students.forEach(student => {
+                localStorage.removeItem(`ratings_${student}`);
+                localStorage.removeItem(`lastAccess_${student}`);
+            });
+            
+            loadStudentsOverview();
+            showNotification('Alle Schülerdaten wurden gelöscht!', 'success');
+        }
+    }
+}
+
+// Beim Login Zeitstempel speichern (für letzten Zugriff)
+const originalLogin = login;
+login = function() {
+    originalLogin();
+    if (currentUser) {
+        localStorage.setItem(`lastAccess_${currentUser}`, new Date().toISOString());
+    }
+};
