@@ -250,40 +250,151 @@ function saveProgress(showFeedback = true) {
 }
 
 function exportProgress() {
-    // Einfache Text-Export Funktion (später können wir PDF hinzufügen)
-    let exportText = `DIGITALER KOMPETENZPASS\n`;
-    exportText += `========================\n\n`;
-    exportText += `Name: ${currentUser}\n`;
-    exportText += `Datum: ${new Date().toLocaleDateString('de-CH')}\n\n`;
-    exportText += `BEWERTUNGEN:\n`;
-    exportText += `------------\n\n`;
+    // jsPDF verwenden für echten PDF-Export
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
     
-    competencies.forEach(comp => {
-        const rating = userRatings[comp.id] || 0;
-        const stars = '★'.repeat(rating) + '☆'.repeat(5 - rating);
-        exportText += `${comp.name.replace(/[^\w\s]/gi, '')}: ${stars} (${rating}/5)\n`;
-        exportText += `  ${comp.description}\n\n`;
-    });
+    // Farben definieren
+    const primaryColor = [102, 126, 234]; // RGB für #667eea
+    const goldColor = [255, 215, 0]; // Gold für Sterne
+    const grayColor = [200, 200, 200]; // Grau für leere Sterne
     
+    // Titel und Header
+    doc.setFontSize(24);
+    doc.setTextColor(...primaryColor);
+    doc.text('DIGITALER KOMPETENZPASS', 105, 25, { align: 'center' });
+    
+    // Linie unter Titel
+    doc.setDrawColor(...primaryColor);
+    doc.setLineWidth(1);
+    doc.line(20, 32, 190, 32);
+    
+    // Persönliche Informationen
+    doc.setFontSize(12);
+    doc.setTextColor(50, 50, 50);
+    doc.text(`Name: ${currentUser}`, 20, 45);
+    doc.text(`Datum: ${new Date().toLocaleDateString('de-CH')}`, 20, 52);
+    doc.text(`Schule: _______________________`, 20, 59);
+    
+    // Gesamtfortschritt berechnen
     const totalPossible = competencies.length * 5;
     const currentTotal = Object.values(userRatings).reduce((sum, rating) => sum + rating, 0);
     const percentage = Math.round((currentTotal / totalPossible) * 100);
     
-    exportText += `\nGESAMTFORTSCHRITT: ${percentage}%\n`;
-    exportText += `========================\n`;
+    // Gesamtfortschritt Box
+    doc.setFillColor(240, 244, 255);
+    doc.roundedRect(20, 70, 170, 25, 3, 3, 'F');
     
-    // Als Datei herunterladen
-    const blob = new Blob([exportText], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Kompetenzpass_${currentUser}_${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    doc.setFontSize(14);
+    doc.setTextColor(...primaryColor);
+    doc.text('GESAMTFORTSCHRITT', 105, 80, { align: 'center' });
     
-    showNotification('📄 Kompetenzpass wurde exportiert!', 'success');
+    // Fortschrittsbalken
+    doc.setFillColor(230, 230, 230);
+    doc.roundedRect(25, 85, 160, 6, 2, 2, 'F');
+    
+    // Gefüllter Teil des Fortschrittsbalkens
+    if (percentage > 0) {
+        doc.setFillColor(72, 187, 120); // Grün
+        doc.roundedRect(25, 85, 160 * (percentage / 100), 6, 2, 2, 'F');
+    }
+    
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${percentage}%`, 105, 89, { align: 'center' });
+    
+    // Kompetenzen Überschrift
+    doc.setFontSize(16);
+    doc.setTextColor(...primaryColor);
+    doc.text('BEWERTUNGEN', 20, 110);
+    
+    // Kompetenzen einzeln
+    let yPosition = 120;
+    
+    competencies.forEach((comp, index) => {
+        const rating = userRatings[comp.id] || 0;
+        
+        // Prüfen ob Platz auf Seite, sonst neue Seite
+        if (yPosition > 250) {
+            doc.addPage();
+            yPosition = 30;
+        }
+        
+        // Kompetenz-Box
+        doc.setFillColor(248, 249, 250);
+        doc.roundedRect(20, yPosition, 170, 28, 3, 3, 'F');
+        
+        // Icon und Titel (ohne Emoji, da PDFs damit Probleme haben)
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont(undefined, 'bold');
+        const cleanName = comp.name.replace(/[^\w\s]/gi, '').trim();
+        doc.text(cleanName, 25, yPosition + 8);
+        
+        // Beschreibung
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text(comp.description, 25, yPosition + 14);
+        
+        // Sterne zeichnen
+        const starX = 25;
+        const starY = yPosition + 20;
+        doc.setFontSize(14);
+        
+        for (let i = 0; i < 5; i++) {
+            if (i < rating) {
+                doc.setTextColor(...goldColor);
+                doc.text('★', starX + (i * 8), starY);
+            } else {
+                doc.setTextColor(...grayColor);
+                doc.text('☆', starX + (i * 8), starY);
+            }
+        }
+        
+        // Bewertungstext
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`${rating}/5`, 70, starY);
+        
+        // Fortschrittsbalken mini
+        doc.setFillColor(230, 230, 230);
+        doc.rect(100, starY - 4, 80, 3, 'F');
+        
+        if (rating > 0) {
+            doc.setFillColor(...primaryColor);
+            doc.rect(100, starY - 4, 80 * (rating / 5), 3, 'F');
+        }
+        
+        yPosition += 35;
+    });
+    
+    // Unterschrift-Bereich
+    if (yPosition > 220) {
+        doc.addPage();
+        yPosition = 30;
+    }
+    
+    yPosition += 10;
+    doc.setDrawColor(150, 150, 150);
+    doc.line(20, yPosition + 20, 90, yPosition + 20);
+    doc.line(120, yPosition + 20, 190, yPosition + 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Unterschrift Schüler/in', 55, yPosition + 28, { align: 'center' });
+    doc.text('Unterschrift Lehrperson', 155, yPosition + 28, { align: 'center' });
+    
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text('Digitaler Kompetenzpass - Informatische Bildung', 105, 285, { align: 'center' });
+    
+    // PDF speichern
+    const filename = `Kompetenzpass_${currentUser}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
+    
+    showNotification('📄 PDF wurde erfolgreich erstellt!', 'success');
 }
 
 // Hilfsfunktion für Benachrichtigungen
